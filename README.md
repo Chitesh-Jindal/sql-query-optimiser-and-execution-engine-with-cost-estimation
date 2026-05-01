@@ -64,6 +64,7 @@ ra-query-optimizer-execution-engine/
 ├── CLIENT.csv
 ├── ASSIGNMENT.csv
 ├── WORKS_ON.csv
+├── sample_queries.txt
 ├── README.md
 ├── LICENSE
 └── .gitignore
