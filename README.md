@@ -254,6 +254,8 @@ The cost model considers:
 
 This allows the system to compare the original query plan with the optimized query plan.
 
+For detailed formulas and assumptions, see [COST_CALCULATION.md](COST_CALCULATION.md).
+
 ---
 
 ## Optimization Technique Implemented
