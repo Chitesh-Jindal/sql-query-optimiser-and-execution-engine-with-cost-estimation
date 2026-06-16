@@ -209,7 +209,7 @@ PROJECT(EMP.NAME,DEPT.NAME)
 Then it calculates the estimated cost of the original query tree:
 
 ```text
-Original Cost: 88 pages
+Original Cost: 97 pages
 ```
 
 After applying selection pushdown, the optimized tree is displayed:
@@ -226,7 +226,7 @@ PROJECT(EMP.NAME,DEPT.NAME)
 Then it calculates the estimated cost of the optimized query tree:
 
 ```text
-Optimized Cost: 68 pages
+Optimized Cost: 83 pages
 ```
 
 Finally, the optimized query tree is executed and the final result is displayed.
