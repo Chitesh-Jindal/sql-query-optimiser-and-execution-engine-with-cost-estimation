@@ -380,20 +380,20 @@ PROJECT(EMP.NAME,DEPT.NAME,EMP.SALARY)
       TABLE(EMP)
       TABLE(DEPT)
 
-Original Cost: 42 pages
+Original Cost: 89 pages
 ```
 
 After optimization:
 
 ```text
-Optimised RA tree :
+Optimized RA tree :
 PROJECT(EMP.NAME,DEPT.NAME,EMP.SALARY)
   JOIN(EMP.DEPTID=DEPT.ID)
     SELECT(EMP.AGE>25 AND EMP.SALARY>60000)
       TABLE(EMP)
     TABLE(DEPT)
 
-Optimised Cost: 27 pages
+Optimized Cost: 69 pages
 ```
 
 This shows that the optimized query plan has lower estimated cost.
