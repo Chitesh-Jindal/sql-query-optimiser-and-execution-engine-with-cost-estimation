@@ -225,16 +225,28 @@ RAnode* optimizer(RAnode* root){
             upperconds.push_back(cond);   // both tables or none
         }
     
-    // push left conditions
-    for(int i = 0; i < leftconds.size(); i++){
-        RAnode* newSelect = new RAnode(NodeType::SELECT, leftconds[i]);
+    // push combined left conditions
+    if(!leftconds.empty()){
+        string combinedLeft = leftconds[0];
+
+        for(int i = 1; i < leftconds.size(); i++){
+            combinedLeft += " AND " + leftconds[i];
+        }
+
+        RAnode* newSelect = new RAnode(NodeType::SELECT, combinedLeft);
         newSelect->left = joinNode->left;
         joinNode->left = newSelect;
     }
 
-    // push right conditions
-    for(int i = 0; i < rightconds.size(); i++){
-        RAnode* newSelect = new RAnode(NodeType::SELECT, rightconds[i]);
+    // push combined right conditions
+    if(!rightconds.empty()){
+        string combinedRight = rightconds[0];
+
+        for(int i = 1; i < rightconds.size(); i++){
+            combinedRight += " AND " + rightconds[i];
+        }
+
+        RAnode* newSelect = new RAnode(NodeType::SELECT, combinedRight);
         newSelect->left = joinNode->right;
         joinNode->right = newSelect;
     }
