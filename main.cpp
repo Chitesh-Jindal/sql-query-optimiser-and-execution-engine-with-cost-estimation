@@ -4,6 +4,7 @@
 #include<map>
 #include<fstream>
 #include<sstream>
+#include<cmath>
 using namespace std;
 
 enum class NodeType{//enum means A type with a fixed set of named constant values
@@ -176,7 +177,7 @@ bool pushdownpossible(RAnode* root){
 }
 
 
-vector<string> checkand(string selectc){
+vector<string> checkand(string selectc){  // breaks select statement into multiple selects based on and
     vector<string> result;
     while(selectc.find("AND") != string::npos){
             size_t andpos = selectc.find("AND");
@@ -277,7 +278,7 @@ void printRelation(const Relation& r){
 map<string,Relation> database;
 
 
-vector<string> splitcomma(string projectstring){
+vector<string> splitcomma(string projectstring){ // extracts what columns to project
     vector<string> required;
     while(projectstring.find(',') != string::npos){
             size_t commapos = projectstring.find(',');
@@ -295,6 +296,7 @@ vector<string> splitcomma(string projectstring){
 
 
 void splitselect(string complete,string& col,string& op, string& val){
+    //extract conditional operand, attribute and condition value
     if(complete.find("<=") != string::npos){
         size_t pos=complete.find("<=");
         col= trim(complete.substr(0,pos));
@@ -362,6 +364,7 @@ Relation executor(RAnode* root){
         Relation child= executor(root->left);
         Relation result;
         vector<string> required= splitcomma(root->value);
+        // required it the array of columns that query want to project
         vector<int> index;
         for(int k=0;k<required.size(); k++){
             for(int i=0; i<child.column.size() ;i++){
@@ -386,6 +389,7 @@ Relation executor(RAnode* root){
         Relation result;
         result.column=child.column;
         vector<string> conditions = checkand(root->value);
+        // conditions contain all the conditions that were seperated by and in the original select condition
         for(const auto& r : child.row){
             bool alltrue = true;
 
@@ -498,6 +502,90 @@ Relation executor(RAnode* root){
 }
 
 
+const int pagesize=256, columnsize=8;
+
+
+class costinfo{
+public:
+    long estimatedRows =0;
+    vector<string> outputColumns;
+    int outputPages;
+    int totalCost=0;
+};
+
+
+int costFormula(long row,long columns){
+    return ceil((double)(row*columns*columnsize)/pagesize);
+}
+
+
+costinfo costCalc(RAnode* root){
+    if(root==nullptr)
+        return costinfo();
+    
+    if(root->type== NodeType::TABLE){
+        costinfo result;
+        Relation r = database[returnTablename(root->value)];
+        result.estimatedRows= r.row.size();
+        result.outputColumns=r.column;
+        result.totalCost=costFormula(result.estimatedRows, result.outputColumns.size());
+        return result;
+    }
+    
+    if(root->type== NodeType::PROJECT){
+        costinfo childcost=costCalc(root->left);
+        costinfo result;
+        result.estimatedRows= childcost.estimatedRows;
+        result.outputColumns = splitcomma(root->value);
+        result.totalCost=costFormula(result.estimatedRows, result.outputColumns.size());
+        result.totalCost = result.totalCost + childcost.totalCost;
+        return result;
+    }
+    
+    if(root->type== NodeType::SELECT){
+        costinfo childcost = costCalc(root->left);
+        Relation selected = executor(root);
+        costinfo result;
+        result.estimatedRows = selected.row.size();
+        result.outputColumns = childcost.outputColumns;
+        
+        result.totalCost=costFormula(result.estimatedRows, result.outputColumns.size());
+        result.totalCost = result.totalCost + childcost.totalCost;
+        return result;
+    }
+    
+    if(root->type == NodeType::JOIN){
+        costinfo leftcost = costCalc(root->left);
+        costinfo rightcost = costCalc(root->right);
+
+        Relation joined = executor(root);
+
+        costinfo result;
+        result.estimatedRows = joined.row.size();
+        result.outputColumns = joined.column;
+        result.outputPages = costFormula(result.estimatedRows, result.outputColumns.size());
+
+        int leftOuterCost =
+            leftcost.outputPages + leftcost.outputPages * rightcost.outputPages;
+
+        int rightOuterCost =
+            rightcost.outputPages + rightcost.outputPages * leftcost.outputPages;
+
+        int joinProcessingCost = min(leftOuterCost, rightOuterCost);
+
+        result.totalCost =
+            leftcost.totalCost +
+            rightcost.totalCost +
+            joinProcessingCost +
+            result.outputPages;
+
+        return result;
+    }
+    return costinfo();
+}
+
+
+
 vector<string> splitCSVLine(string line){
     vector<string> result;
     string value;
@@ -571,10 +659,16 @@ int main(){
     printtree(root,0);
     
     
+    costinfo originalCost = costCalc(root);
+    cout << endl << "Original Cost: " << originalCost.totalCost << " pages" << endl;
+    
     root=optimizer(root);
     
     cout<<endl<<endl<<"Optimised RA tree :"<<endl;
     printtree(root, 0);
+    
+    costinfo optimizedCost = costCalc(root);
+    cout << endl << "Optimised Cost: " << optimizedCost.totalCost << " pages" << endl;
     
     Relation ans = executor(root);
     cout<<endl<<endl<<"Final Result :"<<endl;
