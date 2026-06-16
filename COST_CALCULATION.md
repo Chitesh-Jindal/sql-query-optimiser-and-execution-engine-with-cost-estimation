@@ -203,7 +203,14 @@ Projection usually reduces the number of columns, so the projected output may re
 
 ```cpp
 result.estimatedRows = childcost.estimatedRows;
-result.outputColumns = splitcomma(root->value);
+vector<string> requiredColumns = splitcomma(root->value);
+
+for(string col : requiredColumns){
+    if(col exists in childcost.outputColumns)
+        result.outputColumns.push_back(col);
+    else
+        report invalid column error;
+}
 result.outputPages = costFormula(result.estimatedRows, result.outputColumns.size());
 
 result.totalCost =
