@@ -5,6 +5,7 @@
 #include<fstream>
 #include<sstream>
 #include<cmath>
+#include<algorithm>
 using namespace std;
 
 enum class NodeType{//enum means A type with a fixed set of named constant values
@@ -166,7 +167,7 @@ int checkCondition(string condition, string leftname, string rightname){ // to c
 }
 
 
-bool pushdownpossible(RAnode* root){//checks if selection pushdown needed
+bool pushdownpossible(RAnode* root){
     if(root==nullptr || root->type!=NodeType::PROJECT)
         return false;
     if(root->left==nullptr || root->left->type!=NodeType::SELECT)
@@ -502,58 +503,93 @@ Relation executor(RAnode* root){
 }
 
 
-const int pagesize=256, columnsize=8;
-
+const long long pagesize = 256;
+const long long columnsize = 8;
 
 class costinfo{
 public:
-    long estimatedRows =0;
+    long long estimatedRows = 0;
     vector<string> outputColumns;
-    int outputPages;
-    int totalCost=0;
+    long long outputPages = 0;
+    long long totalCost = 0;
 };
 
+long long costFormula(long long rows, long long columns){
+    if(rows <= 0 || columns <= 0)
+        return 0;
 
-int costFormula(long row,long columns){
-    return ceil((double)(row*columns*columnsize)/pagesize);
+    return (rows * columns * columnsize + pagesize - 1) / pagesize;
 }
 
-
 costinfo costCalc(RAnode* root){
-    if(root==nullptr)
+    if(root == nullptr)
         return costinfo();
-    
-    if(root->type== NodeType::TABLE){
+
+    if(root->type == NodeType::TABLE){
         costinfo result;
+
         Relation r = database[returnTablename(root->value)];
-        result.estimatedRows= r.row.size();
-        result.outputColumns=r.column;
-        result.totalCost=costFormula(result.estimatedRows, result.outputColumns.size());
+
+        result.estimatedRows = r.row.size();
+        result.outputColumns = r.column;
+        result.outputPages = costFormula(result.estimatedRows, result.outputColumns.size());
+        result.totalCost = result.outputPages;
+
         return result;
     }
-    
-    if(root->type== NodeType::PROJECT){
-        costinfo childcost=costCalc(root->left);
+
+    if(root->type == NodeType::PROJECT){
+        costinfo childcost = costCalc(root->left);
         costinfo result;
-        result.estimatedRows= childcost.estimatedRows;
-        result.outputColumns = splitcomma(root->value);
-        result.totalCost=costFormula(result.estimatedRows, result.outputColumns.size());
-        result.totalCost = result.totalCost + childcost.totalCost;
+
+        result.estimatedRows = childcost.estimatedRows;
+
+        vector<string> required = splitcomma(root->value);
+
+        for(string col : required){
+            bool found = false;
+
+            for(string childCol : childcost.outputColumns){
+                if(childCol == col){
+                    result.outputColumns.push_back(col);
+                    found = true;
+                    break;
+                }
+            }
+
+            if(!found){
+                cout << "Column not found in projection cost calculation: " << col << endl;
+            }
+        }
+
+        result.outputPages = costFormula(result.estimatedRows, result.outputColumns.size());
+
+        result.totalCost =
+            childcost.totalCost +
+            childcost.outputPages +
+            result.outputPages;
+
         return result;
     }
-    
-    if(root->type== NodeType::SELECT){
+
+    if(root->type == NodeType::SELECT){
         costinfo childcost = costCalc(root->left);
         Relation selected = executor(root);
+
         costinfo result;
+
         result.estimatedRows = selected.row.size();
         result.outputColumns = childcost.outputColumns;
-        
-        result.totalCost=costFormula(result.estimatedRows, result.outputColumns.size());
-        result.totalCost = result.totalCost + childcost.totalCost;
+        result.outputPages = costFormula(result.estimatedRows, result.outputColumns.size());
+
+        result.totalCost =
+            childcost.totalCost +
+            childcost.outputPages +
+            result.outputPages;
+
         return result;
     }
-    
+
     if(root->type == NodeType::JOIN){
         costinfo leftcost = costCalc(root->left);
         costinfo rightcost = costCalc(root->right);
@@ -561,17 +597,18 @@ costinfo costCalc(RAnode* root){
         Relation joined = executor(root);
 
         costinfo result;
+
         result.estimatedRows = joined.row.size();
         result.outputColumns = joined.column;
         result.outputPages = costFormula(result.estimatedRows, result.outputColumns.size());
 
-        int leftOuterCost =
+        long long leftOuterCost =
             leftcost.outputPages + leftcost.outputPages * rightcost.outputPages;
 
-        int rightOuterCost =
+        long long rightOuterCost =
             rightcost.outputPages + rightcost.outputPages * leftcost.outputPages;
 
-        int joinProcessingCost = min(leftOuterCost, rightOuterCost);
+        long long joinProcessingCost = min(leftOuterCost, rightOuterCost);
 
         result.totalCost =
             leftcost.totalCost +
@@ -581,6 +618,7 @@ costinfo costCalc(RAnode* root){
 
         return result;
     }
+
     return costinfo();
 }
 
