@@ -36,6 +36,7 @@ The cost model uses the following assumptions:
 const int pagesize = 256;
 const int columnsize = 8;
 ```
+This project assumes intermediate result materialization.
 
 ### Page Size
 
